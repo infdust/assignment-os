@@ -13,3 +13,5 @@ clean:
 	rm -rf output
 dist:
 	tar -czvf output/lib0-789.tar.gz makefile lab0.c
+gdb:
+	gdb output/lab0
