@@ -7,6 +7,7 @@
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <errno.h>
 int s_fdcp[256];
@@ -16,6 +17,10 @@ int s_argc = 0;
 char **s_argv = NULL;
 char s_argbuf[BUFSIZ];
 bool verbose = false;
+int waitnum = -256;
+char* child_args[256]={};
+int child_pid[256]={};
+int child_num=0;
 void set_stdin(int fdcp)
 {
     close(STDIN_FILENO);
@@ -79,6 +84,25 @@ char *getarg(bool mode) // 0:get one 1:get all
     }
     return ans;
 }
+void sig_catch(int sig)
+{
+    fprintf(stderr, "caught signal %i\n", sig);
+    exit(sig);
+}
+void sig_wait(int sig)
+{
+    int stat;
+    pid_t pid = wait(&stat);
+    --waitnum;
+    for (int i = 0; i < child_num; ++i)
+        if (child_pid[i] == pid)
+        {
+            child_pid[i] = 0;
+            fprintf(stdout, "exit %i %s\n", stat, child_args[i]);
+            free(child_args[i]);
+            child_args[i] = NULL;
+        }
+}
 int main(int argc, char **argv)
 {
     setarg(argc, argv);
@@ -91,20 +115,77 @@ int main(int argc, char **argv)
     {
         if (false)
             ;
+        else if (!strcmp(arg, "--append"))
+            fflag |= O_APPEND;
+        else if (!strcmp(arg, "--cloexec"))
+            fflag |= O_CLOEXEC;
+        else if (!strcmp(arg, "--creat"))
+            fflag |= O_CREAT;
+        else if (!strcmp(arg, "--directory"))
+            fflag |= O_DIRECTORY;
+        else if (!strcmp(arg, "--dsync"))
+            fflag |= O_DSYNC;
+        else if (!strcmp(arg, "--excl"))
+            fflag |= O_EXCL;
+        else if (!strcmp(arg, "--nofollow"))
+            fflag |= O_NOFOLLOW;
+        else if (!strcmp(arg, "--nonblock"))
+            fflag |= O_NONBLOCK;
+        else if (!strcmp(arg, "--rsync"))
+            fflag |= O_RSYNC;
+        else if (!strcmp(arg, "--sync"))
+            fflag |= O_SYNC;
+        else if (!strcmp(arg, "--trunc"))
+            fflag |= O_TRUNC;
         else if (!strcmp(arg, "--rdonly"))
         {
             fflag |= O_RDONLY;
+            arg = getarg(0);
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            int fdcp = open(arg, fflag);
+            if (fdcp < 0)
+            {
+                fprintf(stderr, "An error occured while opening file: %s, reason as %s.\n", arg, strerror(errno));
+                exit(2);
+            }
+            fflag = 0;
+            s_fdcp[s_fdcpi++] = fdcp;
         }
         else if (!strcmp(arg, "--wronly"))
         {
             fflag |= O_WRONLY;
+            arg = getarg(0);
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            int fdcp = open(arg, fflag);
+            if (fdcp < 0)
+            {
+                fprintf(stderr, "An error occured while opening file: %s, reason as %s.\n", arg, strerror(errno));
+                exit(2);
+            }
+            fflag = 0;
+            s_fdcp[s_fdcpi++] = fdcp;
         }
         else if (!strcmp(arg, "--rdwr"))
         {
             fflag |= O_RDWR;
+            arg = getarg(0);
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            int fdcp = open(arg, fflag);
+            if (fdcp < 0)
+            {
+                fprintf(stderr, "An error occured while opening file: %s, reason as %s.\n", arg, strerror(errno));
+                exit(2);
+            }
+            fflag = 0;
+            s_fdcp[s_fdcpi++] = fdcp;
         }
         else if (!strcmp(arg, "--pipe"))
         {
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
             if (pipe(s_fdcp + s_fdcpi) < 0)
             {
                 fprintf(stderr, "An error occured while construction pipi, reason as %s.\n", strerror(errno));
@@ -118,15 +199,46 @@ int main(int argc, char **argv)
             char *o = getarg(0);
             char *e = getarg(0);
             char *a = getarg(1);
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            int ii = atoi(i);
+            int oo = atoi(o);
+            int ee = atoi(e);
+            ++waitnum;
             pid_t pid = fork();
             if (!pid)
             {
-                set_stdin(s_fdcp[atoi(i)]);
-                set_stdout(s_fdcp[atoi(o)]);
-                set_stderr(s_fdcp[atoi(e)]);
+                while (s_fdcpi-- > 0)
+                    if (s_fdcpi != ii && s_fdcpi != oo && s_fdcpi != ee)
+                        close(s_fdcp[s_fdcpi]);
+                set_stdin(s_fdcp[ii]);
+                set_stdout(s_fdcp[oo]);
+                set_stderr(s_fdcp[ee]);
                 system(a);
+                close(s_fdcp[ii]);
+                close(s_fdcp[oo]);
+                close(s_fdcp[ee]);
                 exit(0);
             }
+            else
+            {
+                child_args[child_num] = (char *)malloc(strlen(a) + 1);
+                strcpy(child_args[child_num], a);
+                child_pid[child_num] = pid;
+                ++child_num;
+            }
+        }
+        else if (!strcmp(arg, "--wait"))
+        {
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            if (waitnum < 0)
+                waitnum += 256;
+            signal(SIGCHLD, sig_wait);
+        }
+        else if (!strcmp(arg, "--close"))
+        {
+            close(s_fdcp[atoi(getarg(0))]);
             if (verbose)
                 write(STDOUT_FILENO, "\n", 1);
         }
@@ -135,84 +247,55 @@ int main(int argc, char **argv)
             if (verbose)
                 write(STDOUT_FILENO, "\n", 1);
             verbose = true;
-        } /*
-
- --append
-     O_APPEND
- --cloexec
-     O_CLOEXEC
- --creat
-     O_CREAT
- --directory
-     O_DIRECTORY
- --dsync
-     O_DSYNC
- --excl
-     O_EXCL
- --nofollow
-     O_NOFOLLOW
- --nonblock
-     O_NONBLOCK
- --rsync
-     O_RSYNC
- --sync
-     O_SYNC
- --trunc
-     O_TRUNC
-
---command i o e cmd args
-    Execute a command with standard input i, standard output o and standard error e;
-    these values should correspond to earlier file or pipe options.
-    The executable for the command is cmd and it has zero or more arguments args.
-    None of the cmd and args operands begin with the two characters "--".
---wait
-    Wait for all commands to finish. As each finishes, output its exit status or signal number
-    as described above, and a copy of the command (with spaces separating arguments) to standard output.
-
---close N
-    Close the Nth file that was opened by a file-opening option.
-    For a pipe, this closes just one end of the pipe.
-    Once file N is closed, it is an error to access it, just as it is an error
-    to access any file number that has never been opened.
-    File numbers are not reused by later file-opening options.
---verbose
-    Just before executing an option, output a line to standard output containing the option.
-    If the option has operands, list them separated by spaces.
-    Ensure that the line is actually output, and is not merely sitting in a buffer somewhere.
---profile
-    Just after executing an option, output a line to standard output containing the resources used.
-    Use getrusage and output a line containing as much useful information as you can glean from it.
---abort
-    Crash the shell. The shell itself should immediately dump core, via a segmentation violation.
---catch N
-    Catch signal N, where N is a decimal integer, with a handler that outputs the diagnostic N caught to stderr,
-    and exits with status N. This exits the entire shell.
-    N uses the same numbering as your system; for example, on GNU/Linux, a segmentation violation is signal 11.
---ignore N
-    Ignore signal N.
---default N
-    Use the default behavior for signal N.
---pause
-    Pause, waiting for a signal to arrive.
-
-
-     */
-        else if (!strcmp(arg, "--"))
+        }
+        else if (!strcmp(arg, "--abort"))
         {
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            *(int *)0 = 0;
+        }
+        else if (!strcmp(arg, "--catch"))
+        {
+            int sig = atoi(getarg(0));
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            signal(sig, sig_catch);
+        }
+        else if (!strcmp(arg, "--ignore"))
+        {
+            int sig = atoi(getarg(0));
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            signal(sig, SIG_IGN);
+        }
+        else if (!strcmp(arg, "--default"))
+        {
+            int sig = atoi(getarg(0));
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            signal(sig, SIG_DFL);
+        }
+        else if (!strcmp(arg, "--pause"))
+        {
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            pause();
         }
         else
         {
-            int fdcp = open(arg, fflag);
-            if (fdcp < 0)
-            {
-                fprintf(stderr, "An error occured while opening file: %s, reason as %s.\n", arg, strerror(errno));
-                exit(2);
-            }
-            fflag = 0;
-            s_fdcp[s_fdcpi++] = fdcp;
-            if (verbose)
-                write(STDOUT_FILENO, "\n", 1);
+            fprintf(stderr, "invalid argument found: %s\n", arg);
         }
     }
+    while (s_fdcpi-- > 0)
+        close(s_fdcp[s_fdcpi]);
+    while (waitnum > 0)
+        pause();
+    for (int i = 0; i < child_num; ++i)
+        if (child_pid[i])
+        {
+            child_pid[i] = 0;
+            free(child_args[i]);
+            child_args[i] = NULL;
+        }
     return 0;
 }
