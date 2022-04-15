@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <errno.h>
 int s_fdcp[256];
@@ -17,10 +19,11 @@ int s_argc = 0;
 char **s_argv = NULL;
 char s_argbuf[BUFSIZ];
 bool verbose = false;
+bool profile = false;
 int waitnum = -256;
-char* child_args[256]={};
-int child_pid[256]={};
-int child_num=0;
+char *child_args[256] = {};
+int child_pid[256] = {};
+int child_num = 0;
 void set_stdin(int fdcp)
 {
     close(STDIN_FILENO);
@@ -93,18 +96,37 @@ void sig_wait(int sig)
 {
     int stat;
     pid_t pid = wait(&stat);
-    --waitnum;
-    for (int i = 0; i < child_num; ++i)
-        if (child_pid[i] == pid)
-        {
-            child_pid[i] = 0;
-            fprintf(stdout, "exit %i %s\n", stat, child_args[i]);
-            free(child_args[i]);
-            child_args[i] = NULL;
-        }
+    if (waitnum-- > 0)
+        for (int i = 0; i < child_num; ++i)
+            if (child_pid[i] == pid)
+            {
+                child_pid[i] = 0;
+                fprintf(stdout, "exit %i %s\n", stat, child_args[i]);
+                free(child_args[i]);
+                child_args[i] = NULL;
+            }
+    if (profile)
+    {
+        struct rusage usage;
+        if (getrusage(RUSAGE_CHILDREN, &usage) >= 0)
+            fprintf(stdout, "usr time:%i.%06is sys time:%i.%06is\n",
+                    usage.ru_utime.tv_sec, usage.ru_utime.tv_usec,
+                    usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+    }
 }
 int main(int argc, char **argv)
 {
+    if (true)
+    {
+        system("(tr A-M n-z < src.txt | sort - | cat - src.txt >> dst.txt) 2>> dst.txt");
+        struct rusage usage;
+        if (getrusage(RUSAGE_CHILDREN, &usage) >= 0)
+            fprintf(stdout, "usr time:%i.%06is sys time:%i.%06is\n",
+                    usage.ru_utime.tv_sec, usage.ru_utime.tv_usec,
+                    usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+        return 0;
+    }
+    signal(SIGCHLD, sig_wait);
     setarg(argc, argv);
     s_fdcp[200] = STDIN_FILENO;
     s_fdcp[201] = STDOUT_FILENO;
@@ -208,6 +230,7 @@ int main(int argc, char **argv)
             pid_t pid = fork();
             if (!pid)
             {
+                signal(SIGCHLD, SIG_DFL);
                 while (s_fdcpi-- > 0)
                     if (s_fdcpi != ii && s_fdcpi != oo && s_fdcpi != ee)
                         close(s_fdcp[s_fdcpi]);
@@ -234,7 +257,6 @@ int main(int argc, char **argv)
                 write(STDOUT_FILENO, "\n", 1);
             if (waitnum < 0)
                 waitnum += 256;
-            signal(SIGCHLD, sig_wait);
         }
         else if (!strcmp(arg, "--close"))
         {
@@ -247,6 +269,12 @@ int main(int argc, char **argv)
             if (verbose)
                 write(STDOUT_FILENO, "\n", 1);
             verbose = true;
+        }
+        else if (!strcmp(arg, "--profile"))
+        {
+            if (verbose)
+                write(STDOUT_FILENO, "\n", 1);
+            profile = true;
         }
         else if (!strcmp(arg, "--abort"))
         {
@@ -297,5 +325,13 @@ int main(int argc, char **argv)
             free(child_args[i]);
             child_args[i] = NULL;
         }
+    if (profile)
+    {
+        struct rusage usage;
+        if (getrusage(RUSAGE_CHILDREN, &usage) >= 0)
+            fprintf(stdout, "usr time:%i.%06is sys time:%i.%06is\n",
+                    usage.ru_utime.tv_sec, usage.ru_utime.tv_usec,
+                    usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+    }
     return 0;
 }
