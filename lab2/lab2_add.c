@@ -122,10 +122,10 @@ int main(int argc, char **argv)
                 opt_sync = 2;
             else if (!strcmp(optarg, "c"))
                 opt_sync = 3;
+            else
+                exit(1);
             break;
         case '?':
-            fprintf(stderr,
-                    "expected arguments:\n--input(=path)\n--output(=path)\n--segfault\n--catch\n--dump-core\n");
             exit(1);
             break;
         }
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
 
         clock_gettime(CLOCK_MONOTONIC, &time_end);
 
-        unsigned long long total_iternum = threadnum;
+        int total_iternum = threadnum;
         total_iternum *= iterationnum;
         total_iternum *= 2;
         unsigned long long total_nanosec = time_end.tv_sec - time_begin.tv_sec;
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
         unsigned long long avg_nanosec = total_nanosec;
         avg_nanosec /= total_iternum;
         char *syncdesc[4] = {"-none", "-m", "-s", "-c"};
-        fprintf(csv, "add%s%s, %i, %i, %llu, %llu, %llu, %lli\n",
+        fprintf(csv, "add%s%s, %i, %i, %i, %llu, %llu, %lli\n",
                 opt_yield ? "-yield" : "", syncdesc[opt_sync], threadnum, iterationnum, total_iternum, total_nanosec, avg_nanosec, counter);
     }
     free(pspin);
