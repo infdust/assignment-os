@@ -116,7 +116,7 @@ void sig_wait(int sig)
 }
 int main(int argc, char **argv)
 {
-    if (true)
+    if (false)
     {
         system("(tr A-M n-z < src.txt | sort - | cat - src.txt >> dst.txt) 2>> dst.txt");
         struct rusage usage;

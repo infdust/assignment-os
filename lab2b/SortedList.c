@@ -3,11 +3,11 @@
 #include <sched.h>
 #include <stdlib.h>
 int opt_yield = 0;
-void nulfunc(u_int64_t a) {}
-void (*func_lockw)(u_int64_t) = nulfunc;
-void (*func_unlockw)(u_int64_t) = nulfunc;
-void (*func_lockr)(u_int64_t) = nulfunc;
-void (*func_unlockr)(u_int64_t) = nulfunc;
+void nulfunc(unsigned long long *a, u_int64_t b) {}
+void (*func_lockw)(unsigned long long *, u_int64_t) = nulfunc;
+void (*func_unlockw)(unsigned long long *, u_int64_t) = nulfunc;
+void (*func_lockr)(unsigned long long *, u_int64_t) = nulfunc;
+void (*func_unlockr)(unsigned long long *, u_int64_t) = nulfunc;
 u_int64_t hash64(const char *key)
 {
     u_int64_t ans = 0;
@@ -18,9 +18,9 @@ u_int64_t hash64(const char *key)
     }
     return ans;
 }
-void SortedList_insert(SortedList_t *list, SortedListElement_t *element)
+void SortedList_insert(unsigned long long *time_used, SortedList_t *list, SortedListElement_t *element)
 {
-    func_lockw((u_int64_t)list->key);
+    func_lockw(time_used, (u_int64_t)list->key);
     if (opt_yield & INSERT_YIELD)
         sched_yield();
     SortedListElement_t *iterator = list->next;
@@ -36,25 +36,25 @@ void SortedList_insert(SortedList_t *list, SortedListElement_t *element)
             element->next = iterator;
             iterator->prev->next = element;
             iterator->prev = element;
-            func_unlockw((u_int64_t)list->key);
+            func_unlockw(time_used, (u_int64_t)list->key);
             return;
         }
     }
 }
-int SortedList_delete(SortedListElement_t *element)
+int SortedList_delete(unsigned long long *time_used, SortedListElement_t *element)
 {
     u_int64_t hash = hash64(element->key);
-    func_lockw(hash);
+    func_lockw(time_used, hash);
     if (opt_yield & DELETE_YIELD)
         sched_yield();
     element->prev->next = element->next;
     element->next->prev = element->prev;
-    func_unlockw(hash);
+    func_unlockw(time_used, hash);
     return 0;
 }
-SortedListElement_t *SortedList_lookup(SortedList_t *list, const char *key)
+SortedListElement_t *SortedList_lookup(unsigned long long *time_used, SortedList_t *list, const char *key)
 {
-    func_lockr((u_int64_t)list->key);
+    func_lockr(time_used, (u_int64_t)list->key);
     if (opt_yield & LOOKUP_YIELD)
         sched_yield();
     SortedListElement_t *iterator = list->next;
@@ -65,19 +65,19 @@ SortedListElement_t *SortedList_lookup(SortedList_t *list, const char *key)
             iterator = iterator->next;
         else if (cmp > 0)
         {
-            func_unlockr((u_int64_t)list->key);
+            func_unlockr(time_used, (u_int64_t)list->key);
             exit(2);
         }
         else
         {
-            func_unlockr((u_int64_t)list->key);
+            func_unlockr(time_used, (u_int64_t)list->key);
             return iterator;
         }
     }
 }
-int SortedList_length(SortedList_t *list)
+int SortedList_length(unsigned long long *time_used, SortedList_t *list)
 {
-    func_lockr((u_int64_t)list->key);
+    func_lockr(time_used, (u_int64_t)list->key);
     if (opt_yield & LOOKUP_YIELD)
         sched_yield();
     int len = 0;
@@ -87,6 +87,6 @@ int SortedList_length(SortedList_t *list)
         ++len;
         iterator = iterator->next;
     }
-    func_unlockr((u_int64_t)list->key);
+    func_unlockr(time_used, (u_int64_t)list->key);
     return len;
 }

@@ -186,7 +186,7 @@ int main(int argc, char **argv)
         unsigned long long avg_nanosec = total_nanosec;
         avg_nanosec /= total_iternum;
         char *syncdesc[4] = {"-none", "-m", "-s", "-c"};
-        fprintf(csv, "add%s%s, %i, %i, %i, %llu, %llu, %lli\n",
+        fprintf(csv, "add%s%s,%i,%i,%i,%llu,%llu,%lli\n",
                 opt_yield ? "-yield" : "", syncdesc[opt_sync], threadnum, iterationnum, total_iternum, total_nanosec, avg_nanosec, counter);
     }
     free(pspin);

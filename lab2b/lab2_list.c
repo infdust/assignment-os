@@ -20,6 +20,7 @@ typedef struct threadParam
     SortedList_t *lists;
     SortedListElement_t *eles;
     int iterationnum;
+    unsigned long long *time_used;
 } threadParam;
 int threadnum = 1;
 int iterationnum = 1;
@@ -28,8 +29,13 @@ int opt_sync = 0; // none m s
 pthread_mutex_t *pmutex[64];
 bool *pspin[64];
 int *access_allow[64];
-void lockw_m(u_int64_t bucket)
+unsigned long long *time_used[64];
+void lockw_m(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     pthread_mutex_lock(pmutex[bucket]);
     while (access_allow[bucket][0] < threadnum)
@@ -40,16 +46,30 @@ void lockw_m(u_int64_t bucket)
     }
     access_allow[bucket][0] -= threadnum;
     pthread_mutex_unlock(pmutex[bucket]);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void unlockw_m(u_int64_t bucket)
+void unlockw_m(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     pthread_mutex_lock(pmutex[bucket]);
     access_allow[bucket][0] += threadnum;
     pthread_mutex_unlock(pmutex[bucket]);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void lockr_m(u_int64_t bucket)
+void lockr_m(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     pthread_mutex_lock(pmutex[bucket]);
     while (access_allow[bucket][0] < 1)
@@ -60,16 +80,30 @@ void lockr_m(u_int64_t bucket)
     }
     --access_allow[bucket][0];
     pthread_mutex_unlock(pmutex[bucket]);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void unlockr_m(u_int64_t bucket)
+void unlockr_m(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     pthread_mutex_lock(pmutex[bucket]);
     ++access_allow[bucket][0];
     pthread_mutex_unlock(pmutex[bucket]);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void lockw_s(u_int64_t bucket)
+void lockw_s(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     while (atomic_exchange(pspin[bucket], true))
         ;
@@ -82,17 +116,31 @@ void lockw_s(u_int64_t bucket)
     }
     access_allow[bucket][0] -= threadnum;
     atomic_store(pspin[bucket], false);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void unlockw_s(u_int64_t bucket)
+void unlockw_s(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     while (atomic_exchange(pspin[bucket], true))
         ;
     access_allow[bucket][0] += threadnum;
     atomic_store(pspin[bucket], false);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void lockr_s(u_int64_t bucket)
+void lockr_s(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     while (atomic_exchange(pspin[bucket], true))
         ;
@@ -105,24 +153,34 @@ void lockr_s(u_int64_t bucket)
     }
     --access_allow[bucket][0];
     atomic_store(pspin[bucket], false);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
-void unlockr_s(u_int64_t bucket)
+void unlockr_s(unsigned long long *time_used, u_int64_t bucket)
 {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used -= (1000000000ull * time.tv_sec + time.tv_nsec);
     bucket %= bucketnum;
     while (atomic_exchange(pspin[bucket], true))
         ;
     ++access_allow[bucket][0];
     atomic_store(pspin[bucket], false);
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    if (time_used)
+        *time_used += (1000000000ull * time.tv_sec + time.tv_nsec);
 }
 void *func_thread(void *pparam)
 {
     const threadParam *params = (const threadParam *)pparam;
     for (int i = 0; i < params->iterationnum; ++i)
-        SortedList_insert(params->lists + hash64(params->eles[i].key) % bucketnum, params->eles + i);
+        SortedList_insert(params->time_used, params->lists + hash64(params->eles[i].key) % bucketnum, params->eles + i);
     for (int i = 0; i < bucketnum; ++i)
-        SortedList_length(params->lists + i);
+        SortedList_length(params->time_used, params->lists + i);
     for (int i = 0; i < params->iterationnum; ++i)
-        SortedList_delete(SortedList_lookup(params->lists + hash64(params->eles[i].key) % bucketnum, params->eles[i].key));
+        SortedList_delete(params->time_used, SortedList_lookup(params->time_used, params->lists + hash64(params->eles[i].key) % bucketnum, params->eles[i].key));
     return NULL;
 }
 int main(int argc, char **argv)
@@ -189,6 +247,8 @@ int main(int argc, char **argv)
         exit(1);
     for (int i = 0; i < 64; ++i)
         access_allow[i] = (int *)malloc(sizeof(int)), access_allow[i][0] = threadnum;
+    for (int i = 0; i < 64; ++i)
+        time_used[i] = (unsigned long long *)malloc(sizeof(unsigned long long)), time_used[i][0] = 0;
     pthread_t *threads = (pthread_t *)malloc(threadnum * sizeof(pthread_t));
     SortedList_t *list = (SortedList_t *)malloc(bucketnum * sizeof(SortedList_t));
     threadParam *params = (threadParam *)malloc(threadnum * sizeof(threadParam));
@@ -205,6 +265,7 @@ int main(int argc, char **argv)
         params[i].iterationnum = iterationnum;
         params[i].lists = list;
         params[i].eles = eles + iterationnum * i;
+        params[i].time_used = time_used[i];
         for (int j = 0; j < iterationnum; ++j)
         {
             params[i].eles[j].prev = NULL;
@@ -263,7 +324,7 @@ int main(int argc, char **argv)
         clock_gettime(CLOCK_MONOTONIC, &time_end);
 
         for (int i = 0; i < bucketnum; ++i)
-            if (SortedList_length(list + i))
+            if (SortedList_length(NULL, list + i))
                 exit(2);
 
         unsigned long long total_nanosec = time_end.tv_sec - time_begin.tv_sec;
@@ -274,9 +335,14 @@ int main(int argc, char **argv)
         avg_nanosec /= iterationnum;
         char *yielddesc[8] = {"-none", "-i", "-d", "-id", "-l", "-il", "-dl", "-idl"};
         char *syncdesc[4] = {"-none", "-m", "-s", "-c"};
-        fprintf(csv, "add%s%s, %i, %i, %i, %llu, %llu\n",
-                yielddesc[opt_yield], syncdesc[opt_sync], threadnum, iterationnum, bucketnum, total_nanosec, avg_nanosec);
+        unsigned long long time_total = 0;
+        for (int i = 0; i < 64; ++i)
+            time_total += time_used[i][0];
+        fprintf(csv, "list%s%s,%i,%i,%i,%i,%llu,%llu,%llu\n",
+                yielddesc[opt_yield], syncdesc[opt_sync], threadnum, iterationnum, bucketnum, threadnum * iterationnum * 3, total_nanosec, avg_nanosec, time_total);
     }
+    for (int i = 0; i < 64; ++i)
+        free(time_used[i]);
     for (int i = 0; i < 64; ++i)
         free(pspin[i]);
     free(keys);

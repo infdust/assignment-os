@@ -252,8 +252,8 @@ int main(int argc, char **argv)
         avg_nanosec /= iterationnum;
         char *yielddesc[8] = {"-none", "-i", "-d", "-id", "-l", "-il", "-dl", "-idl"};
         char *syncdesc[4] = {"-none", "-m", "-s", "-c"};
-        fprintf(csv, "add%s%s, %i, %i, %llu, %llu\n",
-                yielddesc[opt_yield], syncdesc[opt_sync], threadnum, iterationnum, total_nanosec, avg_nanosec);
+        fprintf(csv, "list%s%s,%i,%i,1,%i,%llu,%llu\n",
+                yielddesc[opt_yield], syncdesc[opt_sync], threadnum, iterationnum, threadnum * iterationnum * 3, total_nanosec, avg_nanosec);
     }
     free(pspin);
     free(keys);

@@ -35,7 +35,7 @@ typedef struct SortedListElement SortedListElement_t;
  * @param SortedList_t *list ... header for the list
  * @param SortedListElement_t *element ... element to be added to the list
  */
-void SortedList_insert(SortedList_t *list, SortedListElement_t *element);
+void SortedList_insert(unsigned long long *time_used, SortedList_t *list, SortedListElement_t *element);
 
 /**
  * SortedList_delete ... remove an element from a sorted list
@@ -51,7 +51,7 @@ void SortedList_insert(SortedList_t *list, SortedListElement_t *element);
  * @return 0: element deleted successfully, 1: corrtuped prev/next pointers
  *
  */
-int SortedList_delete(SortedListElement_t *element);
+int SortedList_delete(unsigned long long *time_used, SortedListElement_t *element);
 
 /**
  * SortedList_lookup ... search sorted list for a key
@@ -64,7 +64,7 @@ int SortedList_delete(SortedListElement_t *element);
  *
  * @return pointer to matching element, or NULL if none is found
  */
-SortedListElement_t *SortedList_lookup(SortedList_t *list, const char *key);
+SortedListElement_t *SortedList_lookup(unsigned long long *time_used, SortedList_t *list, const char *key);
 
 /**
  * SortedList_length ... count elements in a sorted list
@@ -75,7 +75,7 @@ SortedListElement_t *SortedList_lookup(SortedList_t *list, const char *key);
  * @return int number of elements in list (excluding head)
  *	   -1 if the list is corrupted
  */
-int SortedList_length(SortedList_t *list);
+int SortedList_length(unsigned long long *time_used, SortedList_t *list);
 
 /**
  * variable to enable diagnositc yield calls
@@ -84,9 +84,9 @@ extern int opt_yield;
 #define INSERT_YIELD 0x01 // yield in insert critical section
 #define DELETE_YIELD 0x02 // yield in delete critical section
 #define LOOKUP_YIELD 0x04 // yield in lookup/length critical esction
-extern void (*func_lockw)();
-extern void (*func_unlockw)();
-extern void (*func_lockr)();
-extern void (*func_unlockr)();
 typedef unsigned long int u_int64_t;
-u_int64_t hash64(const char* key);
+extern void (*func_lockw)(unsigned long long *, u_int64_t);
+extern void (*func_unlockw)(unsigned long long *, u_int64_t);
+extern void (*func_lockr)(unsigned long long *, u_int64_t);
+extern void (*func_unlockr)(unsigned long long *, u_int64_t);
+u_int64_t hash64(const char *key);
